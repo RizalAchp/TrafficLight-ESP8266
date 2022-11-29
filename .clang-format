@@ -1,47 +1,9 @@
 ---
-BasedOnStyle: Google
 Standard: c++17
-IndentWidth: 4
----
-Language: Cpp
-PointerAlignment: Right
-AlignAfterOpenBracket: Align
-DerivePointerAlignment: false
-AlignArrayOfStructures: Right
-BreakConstructorInitializers: BeforeComma
-AllowAllArgumentsOnNextLine: true
-AllowAllParametersOfDeclarationOnNextLine: true
-# IndentRequiresClause: true
-# EmptyLineBeforeAccessModifier: LogicalBlock
-FixNamespaceComments: true
-IncludeBlocks: Regroup
-
-NamespaceIndentation: All
-CompactNamespaces: true
-AllowShortCaseLabelsOnASingleLine: true
-AlignEscapedNewlines: Left
-AlignTrailingComments: true
-# AlignConsecutiveMacros: AcrossEmptyLinesAndComments
-# AlignConsecutiveDeclarations: AcrossEmptyLines
-# AlignConsecutiveAssignments: AcrossEmptyLinesAndComments
-AllowShortFunctionsOnASingleLine: All
-
-ColumnLimit: '100'
-
-AlwaysBreakTemplateDeclarations: Yes
-AlignConsecutiveMacros: AcrossEmptyLines
-AlignConsecutiveAssignments: AcrossEmptyLines
-AllowShortLambdasOnASingleLine: All
-AllowShortIfStatementsOnASingleLine: AllIfsAndElse
-
-BreakBeforeBraces: Custom
-BraceWrapping:
-  AfterEnum: true
-  AfterClass: false
-  AfterStruct: false
-  AfterNamespace: true
-  AfterCaseLabel: false
-  AfterFunction: false
-  SplitEmptyFunction: false
-  AfterControlStatement: MultiLine
+BasedOnStyle: LLVM
+IndentWidth: 8
+UseTab: Always
+BreakBeforeBraces: Linux
+AllowShortIfStatementsOnASingleLine: false
+IndentCaseLabels: false
 ---

@@ -2,9 +2,11 @@
 #PATH := /usr/local/bin:$(PATH)
 
 
-all:
-	@rm -rf ./compile_commands.json
+all: clean
 	bear -- bash -c "pio -f -c vim run"
+
+build:
+	pio -f -c vim run
 
 upload:
 	pio -f -c vim run --target upload
