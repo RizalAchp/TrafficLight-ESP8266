@@ -5,8 +5,86 @@
 
 #include <Arduino.h>
 #include <AsyncMqttClient.h>
-#include <ESP8266WiFi.h>
 #include <Ticker.h>
+
+#if defined(ESP8266)
+#include <ESP8266WiFi.h>
+
+/// define for pin led / lamp
+#define RED_LED D5
+#define YELLOW_LED D6
+#define GREEN_LED D7
+
+#define Handler_t
+#define RECONNECT_DEF(_WIFI, _MQTT)                                            \
+	Ticker _WIFI;                                                          \
+	Ticker _MQTT;
+
+#define CREATE_RECONNECT_CALLBACK(VAR, NAME, FUNC)
+#define START_TIMER(VAR, _FUNC) VAR.once(2, _FUNC)
+#define STOP_TIMER(VAR) VAR.detach();
+
+#define HANDLE_EVENT(ON_CONNECT, ON_DISCONNECT)                                \
+	WiFiEventHandler ON_CONNECT(                                           \
+	    WiFi.onStationModeGotIP([](const WiFiEventStationModeGotIP &ev) {  \
+		    PRINTLN("CONNECTED TO WIFI!");                             \
+		    PRINTF("ip: %s, mask: %s, gateway: %s\n",                  \
+			   ev.ip.toString().c_str(),                           \
+			   ev.mask.toString().c_str(),                         \
+			   ev.gw.toString().c_str());                          \
+		    mqttClient.connect();                                      \
+	    }));                                                               \
+	WiFiEventHandler ON_DISCONNECT(                                        \
+	    WiFi.onStationModeDisconnected([](auto ev) {                       \
+		    PRINT_WIFI_DISCONNECT_REASON(ev);                          \
+		    STOP_TIMER(mqttReconnectTimer);                            \
+		    START_TIMER(wifiReconnectTimer, []() {                     \
+			    WiFi.begin(SECRET_SSID, SECRET_PASSWORD);          \
+		    });                                                        \
+	    }));
+
+#else
+#include <WiFi.h>
+extern "C" {
+#include "freertos/FreeRTOS.h"
+#include "freertos/timers.h"
+}
+#define RED_LED 4
+#define YELLOW_LED 16
+#define GREEN_LED 17
+
+typedef TimerHandle_t Handler_t;
+#define RECONNECT_DEF(_WIFI, _MQTT)                                            \
+	TimerHandle_t _WIFI;                                                   \
+	TimerHandle_t _MQTT;
+
+#define CREATE_RECONNECT_CALLBACK(VAR, NAME, FUNC)                             \
+	VAR = xTimerCreate(NAME, pdMS_TO_TICKS(2000), pdFALSE, (void *)0, FUNC);
+
+#define START_TIMER(VAR, _FUNC) xTimerStart(VAR, 0);
+#define STOP_TIMER(VAR, _FUNC) xTimerStop(VAR, 0);
+#define HANDLE_EVENT(_A, _B)                                                   \
+	auto _ =                                                               \
+	    WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t eventinfo) {    \
+		    PRINTF("[WiFi-event] event: %d\n", event);                 \
+		    switch (event) {                                           \
+		    case ARDUINO_EVENT_WIFI_STA_GOT_IP:                        \
+			    PRINTLN("WiFi connected... IP address: ");         \
+			    PRINTLN(WiFi.localIP());                           \
+			    mqttClient.connect();                              \
+			    break;                                             \
+		    case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:                  \
+			    PRINTLN("WiFi lost connection");                   \
+			    STOP_TIMER(mqttReconnectTimer, []() {});           \
+			    START_TIMER(wifiReconnectTimer, []() {});          \
+			    break;                                             \
+		    default:                                                   \
+			    break;                                             \
+		    }                                                          \
+	    })
+
+#endif
+
 /// #include <LiquidCrystal_I2C.h>
 
 /////////////////////////////////////////////////////////////////////////
@@ -32,9 +110,10 @@ enum StateType {
 #define PRINTF(...) Serial.printf(__VA_ARGS__)
 #define BOOLSTR(_BOOL) ((_BOOL) ? "true" : "false")
 void PRINT_MQTT_DISCONNECT_REASON(AsyncMqttClientDisconnectReason reason);
-void PRINT_WIFI_DISCONNECT_REASON(const WiFiEventStationModeDisconnected &ev);
 void PRINT_STATE(StateType type, const unsigned long elapsed);
-
+#if defined(ESP8266)
+void PRINT_WIFI_DISCONNECT_REASON(const WiFiEventStationModeDisconnected &ev);
+#endif
 #else
 #define SERIAL_BEGIN(...)
 #define PRINT(...)
@@ -51,7 +130,10 @@ void PRINT_STATE(StateType type, const unsigned long elapsed);
 //////////////////////////////////////////////////////////////////////
 
 /// INTERVAL DALAM MILISECOND ( detik * 1000 )
-constexpr auto SECOND_MS(const unsigned long SEC) { return 1000UL * SEC; }
+constexpr unsigned long SECOND_MS(const unsigned long SEC)
+{
+	return 1000UL * SEC;
+}
 
 /// constant array to make an easier access by indexing with StateType
 constexpr const unsigned long INTERVALS[] = {

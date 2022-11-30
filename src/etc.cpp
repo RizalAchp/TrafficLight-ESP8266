@@ -1,10 +1,4 @@
-#include <Arduino.h>
-#include <IPAddress.h>
-
 #include <config.hpp>
-
-#include "AsyncMqttClient.h"
-#include "ESP8266WiFi.h"
 
 #if !RELEASE
 void PRINT_MQTT_DISCONNECT_REASON(AsyncMqttClientDisconnectReason reason)
@@ -38,6 +32,7 @@ void PRINT_MQTT_DISCONNECT_REASON(AsyncMqttClientDisconnectReason reason)
 		break;
 	}
 }
+#if defined(ESP8266)
 void PRINT_WIFI_DISCONNECT_REASON(const WiFiEventStationModeDisconnected &ev)
 {
 	PRINTF("Disconnected from Wi-Fi with ssid: %s\r\n", ev.ssid.c_str());
@@ -131,6 +126,7 @@ void PRINT_WIFI_DISCONNECT_REASON(const WiFiEventStationModeDisconnected &ev)
 		break;
 	}
 }
+#endif
 
 constexpr const char *NAME_STATE_CONSTANT[] = {
     /*StateType::GREEN*/ "Green",

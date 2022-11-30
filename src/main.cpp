@@ -1,56 +1,28 @@
+#include <Arduino.h>
 #include <config.hpp>
-
-/// define for pin led / lamp
-#define RED_LED D5
-#define YELLOW_LED D6
-#define GREEN_LED D7
-
-/// client mqtt object
-AsyncMqttClient mqttClient;
-/// ticker untuk callback reconnect
-Ticker mqttReconnectTimer;
-Ticker wifiReconnectTimer;
-
-#if !RELEASE
-Ticker printerStateTimer;
-#endif
 
 /// variable to store `millis()` value
 unsigned long startTime = 0;
 /// variable to compare time elapsed from `millis()`
 unsigned long elapsedTime = 0;
 /// state variable
-
 StateType nextState = StateType::GREEN;
 StateType currentState = StateType::GREEN;
 StateType lastState = StateType::YELLOW;
-
 /// variable to check if car is greater than 5
 bool isCarGreaterThanFive = false;
+/// client mqtt object
+AsyncMqttClient mqttClient;
+RECONNECT_DEF(wifiReconnectTimer, mqttReconnectTimer);
 
 /// callback event saat Wifi mendapatkan STA IP dari AccessPoint Wifi
 /// (connected)
 /// =>  mencoba untuk connect pada broker MQTT server
-WiFiEventHandler wifiConnectHandler(WiFi.onStationModeGotIP([](auto ev) {
-	PRINTLN("CONNECTED TO WIFI!");
-	PRINTF("ip: %s, mask: %s, gateway: %s\n", ev.ip.toString().c_str(),
-	       ev.mask.toString().c_str(), ev.gw.toString().c_str());
-	mqttClient.connect();
-}));
+HANDLE_EVENT(wifiConnectHandler, wifiDisconnectHandler);
 
-/// callback event saat WiFi terputus (disconnected)
-/// =>  mencoba untuk reconnect menggunakan timer callback
-///     dan detach timer mqtt agar tidak reconnect pada broker saat wifi belum
-///     tersedia
-WiFiEventHandler
-    wifiDisconnectHandler(WiFi.onStationModeDisconnected([](auto ev) {
-	    PRINT_WIFI_DISCONNECT_REASON(ev);
-	    // ensure we don't reconnect to MQTT while reconnecting to Wi-Fi
-	    mqttReconnectTimer.detach();
-	    // pass lamda to wifiReconnectTimer to call WiFi.begin(..)
-	    wifiReconnectTimer.once(
-		2, []() { WiFi.begin(SECRET_SSID, SECRET_PASSWORD); });
-    }));
+#if !RELEASE
+Ticker printerStateTimer;
+#endif
 
 /// callback event saat Mqtt client telah tersambung pada server broker MQTT
 /// =>  subscribe pada topic yang telah di tentukan
@@ -59,12 +31,12 @@ inline static void OnMqttEventConnect(bool sessionPresent)
 	PRINTLN("Connected to MQTT.");
 	PRINTF("Session present: %s\n", BOOLSTR(sessionPresent));
 	auto _id1 = mqttClient.subscribe(TOPIC_CAPTURE, DEFAULT_QOS);
-	PRINTF("Subscribing to topic '%s' with QoS 0, packetId: %d",
-	       TOPIC_CAPTURE, _id1);
-	(void)(_id1); // ignore warning unused variable on release
+	PRINTF("Subscribe to topic '%s', QoS 0, id: %d", TOPIC_CAPTURE, _id1);
 	auto _id2 = mqttClient.subscribe(TOPIC_COUNT_OF_CAR, DEFAULT_QOS);
-	PRINTF("Subscribing to topic '%s' with QoS 0, packetId: %d",
-	       TOPIC_COUNT_OF_CAR, _id2);
+	PRINTF("Subscribe to topic '%s', QoS 0, id: %d", TOPIC_COUNT_OF_CAR,
+	       _id2);
+
+	(void)(_id1); // ignore warning unused variable on release
 	(void)(_id2); // ignore warning unused variable on release
 }
 
@@ -75,16 +47,15 @@ inline static void OnMqttEventDisconnect(AsyncMqttClientDisconnectReason reason)
 	// if debug print reason why disconnected
 	PRINT_MQTT_DISCONNECT_REASON(reason);
 	if (WiFi.isConnected())
-		mqttReconnectTimer.once(2, []() { mqttClient.connect(); });
+		START_TIMER(mqttReconnectTimer, []() { mqttClient.connect(); });
 }
 
 /// callback event saat mqtt client mendapatkan message publish dari broker
 /// => check apakah topic sesuai dengan yang dibutuhkan dan memproses payload
 /// nya
-inline static void
-OnMqttEventMessage(char *topic, char *payload,
-		   AsyncMqttClientMessageProperties properties, size_t len,
-		   size_t index, size_t total)
+inline static void OnMqttEventMessage(char *topic, char *payload,
+				      AsyncMqttClientMessageProperties prop,
+				      size_t len, size_t index, size_t total)
 {
 	/// early return if payload is null
 	if (payload == nullptr)
@@ -92,7 +63,7 @@ OnMqttEventMessage(char *topic, char *payload,
 
 	static char tempbuf[32] = {0};
 	memcpy(tempbuf, payload, len);
-    tempbuf[len] = '\0';
+	tempbuf[len] = '\0';
 	/// compare each topics
 	if (0 == strcmp(topic, TOPIC_COUNT_OF_CAR)) {
 		/// parse string payload into unsigned integer
@@ -111,8 +82,8 @@ OnMqttEventMessage(char *topic, char *payload,
 	PRINTLN("OnMessage:");
 	PRINTF("\ttopic   : %s\r\n", topic);
 	PRINTF("\tpaylodd : %s\r\n", tempbuf);
-	PRINTF("\tqos     : %u\r\n", properties.qos);
-	PRINTF("\tretain  : %s\r\n", BOOLSTR(properties.qos));
+	PRINTF("\tqos     : %u\r\n", prop.qos);
+	PRINTF("\tretain  : %s\r\n", BOOLSTR(prop.qos));
 	PRINTF("\tlen     : %zu\r\n", len);
 	PRINTF("\tindex   : %zu\r\n", index);
 	PRINTF("\ttotal   : %zu\r\n", total);
@@ -138,14 +109,17 @@ inline static void publish_message_capture()
 void setup()
 {
 	SERIAL_BEGIN(115200);
-	///////////////
 	/// LED begin ( set pinMode )
 	pinMode(RED_LED, OUTPUT);
 	pinMode(YELLOW_LED, OUTPUT);
 	pinMode(GREEN_LED, OUTPUT);
-	///////////////
+
+	CREATE_RECONNECT_CALLBACK(
+	    wifiReconnectTimer, "wifiTimer",
+	    [](Handler_t t_) { WiFi.begin(SECRET_SSID, SECRET_PASSWORD); });
+	CREATE_RECONNECT_CALLBACK(mqttReconnectTimer, "mqttTimer",
+				  [](Handler_t _t) { mqttClient.connect(); });
 	/// start service ( mencoba connecting ke wifi and broker mqtt )
-	PRINTLN("Settingup client...");
 	mqttClient
 	    // set client id
 	    .setClientId(MQTT_CLIENT_ID)
@@ -172,8 +146,8 @@ void setup()
 
 #if !RELEASE
 	/// precicion timer to print state each seconds
-	printerStateTimer.attach(
-	    1.f, []() { PRINT_STATE(currentState, elapsedTime); });
+	printerStateTimer.attach_ms(
+	    1000, []() { PRINT_STATE(currentState, elapsedTime); });
 #endif
 }
 
