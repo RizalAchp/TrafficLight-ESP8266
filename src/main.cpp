@@ -189,6 +189,8 @@ void loop()
 			nextState = (isCarGreaterThanFive == true)
 					? StateType::ISFIVE
 					: StateType::YELLOW;
+
+            isCarGreaterThanFive = false;
 		}
 		break;
 
