@@ -88,17 +88,13 @@ OnMqttEventMessage(char *topic, char *payload,
 {
 	/// compare each topics
 	if (0 == strcmp(topic, TOPIC_COUNT_OF_CAR)) {
-		char *p;
 		/// parse string payload into unsigned integer
 		// check if ppayload greater than 5
-		auto isgreather = (strtol(payload, &p, 10) > 5);
-		// check if payload is parsed successfully
-		auto converted = (*p == 0);
+		auto isgreather = (atoi(payload) > 5);
 		// check if currentState is only on state green
 		auto isgreen = (currentState == StateType::GREEN);
-
 		/// and check all the condition
-		isCarGreaterThanFive = (isgreen && isgreather && converted);
+		isCarGreaterThanFive = (isgreen && isgreather);
 	}
 	if (0 == strcmp(topic, TOPIC_CAPTURE)) {
 		/// do something for capture
