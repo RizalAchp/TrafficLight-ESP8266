@@ -87,8 +87,7 @@ OnMqttEventMessage(char *topic, char *payload,
 		   size_t index, size_t total)
 {
 	/// compare each topics
-	if (0 ==
-	    strncmp(topic, TOPIC_COUNT_OF_CAR, sizeof(TOPIC_COUNT_OF_CAR))) {
+	if (0 == strcmp(topic, TOPIC_COUNT_OF_CAR)) {
 		char *p;
 		/// parse string payload into unsigned integer
 		// check if ppayload greater than 5
@@ -101,7 +100,7 @@ OnMqttEventMessage(char *topic, char *payload,
 		/// and check all the condition
 		isCarGreaterThanFive = (isgreen && isgreather && converted);
 	}
-	if (0 == strncmp(topic, TOPIC_CAPTURE, sizeof(TOPIC_CAPTURE))) {
+	if (0 == strcmp(topic, TOPIC_CAPTURE)) {
 		/// do something for capture
 	}
 
@@ -125,11 +124,11 @@ inline static void ledOnState(const uint8_t red, const uint8_t yellow,
 
 inline static void publish_message_capture()
 {
-	if (!mqttClient.connected() &&
-	    !(elapsedTime >= INTERVALS[StateType::CAPTURE]))
-		return;
-	mqttClient.publish(TOPIC_CAPTURE, DEFAULT_QOS, DEFAULT_RETAIN,
-			   TOPIC_CAPTURE, sizeof(TOPIC_CAPTURE));
+	if (mqttClient.connected() &&
+	    (elapsedTime >= INTERVALS[StateType::CAPTURE])) {
+		mqttClient.publish(TOPIC_CAPTURE, DEFAULT_QOS, DEFAULT_RETAIN,
+				   TOPIC_CAPTURE, sizeof(TOPIC_CAPTURE));
+	}
 }
 
 void setup()
@@ -190,7 +189,12 @@ void loop()
 					? StateType::ISFIVE
 					: StateType::YELLOW;
 
-            isCarGreaterThanFive = false;
+			if (mqttClient.connected()) {
+				mqttClient.publish(TOPIC_COUNT_OF_CAR,
+						   DEFAULT_QOS, DEFAULT_RETAIN,
+						   "0", sizeof("0"));
+				isCarGreaterThanFive = false;
+			}
 		}
 		break;
 
