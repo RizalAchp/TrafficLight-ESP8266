@@ -174,15 +174,6 @@ void setup()
 #endif
 }
 
-/// macro to make code in loop cleaner
-#define CONDITION_STATE(/*..currentState..*/ TYPE, /*..nextState..*/ NEXT)     \
-	if (elapsedTime >= INTERVALS[TYPE]) {                                  \
-		elapsedTime = 0;                                               \
-		lastState = TYPE;                                              \
-		nextState = NEXT;                                              \
-		isCarGreaterThanFive = false;                                  \
-	}
-
 void loop()
 {
 	/// update state dan interval dengan millis
@@ -191,27 +182,43 @@ void loop()
 	switch (currentState) {
 	case StateType::GREEN:
 		ledOnState(0, 0, 1);
-		CONDITION_STATE(StateType::GREEN,
-				((isCarGreaterThanFive) ? StateType::ISFIVE
-							: StateType::YELLOW));
+
+		if (elapsedTime >= INTERVALS[StateType::GREEN]) {
+			elapsedTime = 0;
+			lastState = StateType::GREEN;
+			nextState = (isCarGreaterThanFive == true)
+					? StateType::ISFIVE
+					: StateType::YELLOW;
+		}
 		break;
 
 	case StateType::ISFIVE: /// state saat terdeteksi 5 mobil
 		ledOnState(0, 0, 1);
-		CONDITION_STATE(StateType::ISFIVE, StateType::YELLOW);
+		if (elapsedTime >= INTERVALS[StateType::ISFIVE]) {
+			elapsedTime = 0;
+			nextState = StateType::YELLOW;
+		}
 		break;
 
 	case StateType::YELLOW:
 		ledOnState(0, 1, 0);
-		CONDITION_STATE(
-		    StateType::YELLOW,
-		    ((lastState) ? StateType::GREEN : StateType::RED));
+		if (elapsedTime >= INTERVALS[StateType::YELLOW]) {
+			elapsedTime = 0;
+			nextState = (lastState == StateType::RED)
+					? StateType::GREEN
+					: StateType::RED;
+		}
 		break;
 
 	case StateType::RED:
 		ledOnState(1, 0, 0);
 		publish_message_capture();
-		CONDITION_STATE(StateType::RED, StateType::YELLOW);
+
+		if (elapsedTime >= INTERVALS[StateType::RED]) {
+			elapsedTime = 0;
+			lastState = StateType::RED;
+			nextState = StateType::YELLOW;
+		}
 		break;
 
 	default:
