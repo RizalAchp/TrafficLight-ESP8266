@@ -24,20 +24,20 @@ HANDLE_EVENT(wifiConnectHandler, wifiDisconnectHandler);
 Ticker printerStateTimer;
 #endif
 
+inline static void subscribe(const char *topic, uint8_t qos)
+{
+	auto id = mqttClient.subscribe(topic, qos);
+	PRINTF("Subscribe to topic '%s', QoS 0, id: %ud", topic, id);
+	IGNORE(id);
+}
 /// callback event saat Mqtt client telah tersambung pada server broker MQTT
 /// =>  subscribe pada topic yang telah di tentukan
 inline static void OnMqttEventConnect(bool sessionPresent)
 {
-	PRINTLN("Connected to MQTT.");
+	PRINTLN(F("Connected to MQTT."));
 	PRINTF("Session present: %s\n", BOOLSTR(sessionPresent));
-	auto _id1 = mqttClient.subscribe(TOPIC_CAPTURE, DEFAULT_QOS);
-	PRINTF("Subscribe to topic '%s', QoS 0, id: %d", TOPIC_CAPTURE, _id1);
-	auto _id2 = mqttClient.subscribe(TOPIC_COUNT_OF_CAR, DEFAULT_QOS);
-	PRINTF("Subscribe to topic '%s', QoS 0, id: %d", TOPIC_COUNT_OF_CAR,
-	       _id2);
-
-	(void)(_id1); // ignore warning unused variable on release
-	(void)(_id2); // ignore warning unused variable on release
+	subscribe(TOPIC_CAPTURE, DEFAULT_QOS);
+	subscribe(TOPIC_COUNT_OF_CAR, DEFAULT_QOS);
 }
 
 /// callback event saat Mqtt client terputus dari sambungan mqtt server broker
@@ -79,7 +79,7 @@ inline static void OnMqttEventMessage(char *topic, char *payload,
 	}
 
 	/// if debug, print all the passed message parameter
-	PRINTLN("OnMessage:");
+	PRINTLN(F("OnMessage:"));
 	PRINTF("\ttopic   : %s\r\n", topic);
 	PRINTF("\tpaylodd : %s\r\n", tempbuf);
 	PRINTF("\tqos     : %u\r\n", prop.qos);
@@ -140,7 +140,7 @@ void setup()
 	    // set username and pasword (default null)
 	    .setCredentials(MQTT_USERNAME, MQTT_PASSWORD);
 
-	PRINTLN("Connect to Wifi");
+	PRINTLN(F("Connect to Wifi"));
 	// connect to wifi
 	WiFi.begin(SECRET_SSID, SECRET_PASSWORD);
 

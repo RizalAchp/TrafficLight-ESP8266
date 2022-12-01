@@ -219,5 +219,6 @@ constexpr const unsigned long INTERVALS[] = {
 #else
 #define MQTT_PASSWORD _MQTT_PASSWORD
 #endif
+#define IGNORE(_VAR) ((void)(_VAR))
 
 #endif
