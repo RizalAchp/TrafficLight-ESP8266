@@ -1,49 +1,42 @@
 #include <config.hpp>
 
-/// define for pin led / lamp
-#define RED_LED D5
-#define YELLOW_LED D6
-#define GREEN_LED D7
-
+#define MAX_PAYLOAD_BUFFER_SIZE 32
 /// client mqtt object
 AsyncMqttClient mqttClient;
 /// ticker untuk callback reconnect
 Ticker mqttReconnectTimer;
 Ticker wifiReconnectTimer;
+Ticker StateTimer;
 
-#if !RELEASE
-Ticker printerStateTimer;
-#endif
-
-/// variable to store `millis()` value
-unsigned long startTime = 0;
-/// variable to compare time elapsed from `millis()`
-unsigned long elapsedTime = 0;
+/// variable to compare time elapsed in second
+/// (karena tidak akan melebihi 256 second, jadi saya menggunakan uint8_t)
+uint8_t elapsedTime = 0;
 /// state variable
-
-StateType nextState = StateType::GREEN;
 StateType currentState = StateType::GREEN;
 StateType lastState = StateType::YELLOW;
 
 /// variable to check if car is greater than 5
-bool isCarGreaterThanFive = false;
+uint8_t count_of_car = 0;
+bool isCaptured = false;
 
 /// callback event saat Wifi mendapatkan STA IP dari AccessPoint Wifi
 /// (connected)
 /// =>  mencoba untuk connect pada broker MQTT server
-WiFiEventHandler wifiConnectHandler(WiFi.onStationModeGotIP([](auto ev) {
-	PRINTLN("CONNECTED TO WIFI!");
-	PRINTF("ip: %s, mask: %s, gateway: %s\n", ev.ip.toString().c_str(),
-	       ev.mask.toString().c_str(), ev.gw.toString().c_str());
-	mqttClient.connect();
-}));
+WiFiEventHandler wifiConnectHandler(
+    WiFi.onStationModeGotIP([](const WiFiEventStationModeGotIP &ev) {
+	    PRINTLN(F("CONNECTED TO WIFI!"));
+	    PRINTF("IP 		: %s\r\n", ev.ip.toString().c_str());
+	    PRINTF("MASK	: %s\r\n", ev.mask.toString().c_str());
+	    PRINTF("GATEAWAY: %s\r\n", ev.gw.toString().c_str());
+	    mqttClient.connect();
+    }));
 
 /// callback event saat WiFi terputus (disconnected)
 /// =>  mencoba untuk reconnect menggunakan timer callback
 ///     dan detach timer mqtt agar tidak reconnect pada broker saat wifi belum
 ///     tersedia
-WiFiEventHandler
-    wifiDisconnectHandler(WiFi.onStationModeDisconnected([](auto ev) {
+WiFiEventHandler wifiDisconnectHandler(WiFi.onStationModeDisconnected(
+    [](const WiFiEventStationModeDisconnected &ev) {
 	    PRINT_WIFI_DISCONNECT_REASON(ev);
 	    // ensure we don't reconnect to MQTT while reconnecting to Wi-Fi
 	    mqttReconnectTimer.detach();
@@ -51,89 +44,6 @@ WiFiEventHandler
 	    wifiReconnectTimer.once(
 		2, []() { WiFi.begin(SECRET_SSID, SECRET_PASSWORD); });
     }));
-
-/// callback event saat Mqtt client telah tersambung pada server broker MQTT
-/// =>  subscribe pada topic yang telah di tentukan
-inline static void OnMqttEventConnect(bool sessionPresent)
-{
-	PRINTLN("Connected to MQTT.");
-	PRINTF("Session present: %s\n", BOOLSTR(sessionPresent));
-	auto _id1 = mqttClient.subscribe(TOPIC_CAPTURE, DEFAULT_QOS);
-	PRINTF("Subscribing to topic '%s' with QoS 0, packetId: %d",
-	       TOPIC_CAPTURE, _id1);
-	(void)(_id1); // ignore warning unused variable on release
-	auto _id2 = mqttClient.subscribe(TOPIC_COUNT_OF_CAR, DEFAULT_QOS);
-	PRINTF("Subscribing to topic '%s' with QoS 0, packetId: %d",
-	       TOPIC_COUNT_OF_CAR, _id2);
-	(void)(_id2); // ignore warning unused variable on release
-}
-
-/// callback event saat Mqtt client terputus dari sambungan mqtt server broker
-/// =>  subscribe pada topic yang telah di tentukan
-inline static void OnMqttEventDisconnect(AsyncMqttClientDisconnectReason reason)
-{
-	// if debug print reason why disconnected
-	PRINT_MQTT_DISCONNECT_REASON(reason);
-	if (WiFi.isConnected())
-		mqttReconnectTimer.once(2, []() { mqttClient.connect(); });
-}
-
-/// callback event saat mqtt client mendapatkan message publish dari broker
-/// => check apakah topic sesuai dengan yang dibutuhkan dan memproses payload
-/// nya
-inline static void
-OnMqttEventMessage(char *topic, char *payload,
-		   AsyncMqttClientMessageProperties properties, size_t len,
-		   size_t index, size_t total)
-{
-	/// early return if payload is null
-	if (payload == nullptr)
-		return;
-
-	static char tempbuf[32] = {0};
-	memcpy(tempbuf, payload, len);
-	tempbuf[len] = '\0';
-	/// compare each topics
-	if (0 == strcmp(topic, TOPIC_COUNT_OF_CAR)) {
-		/// parse string payload into unsigned integer
-		// check if ppayload greater than 5
-		auto isgreather = (atoi(tempbuf) > 5);
-		// check if currentState is only on state green
-		auto isgreen = (currentState == StateType::GREEN);
-		/// and check all the condition
-		isCarGreaterThanFive = (isgreen && isgreather);
-	}
-	if (0 == strcmp(topic, TOPIC_CAPTURE)) {
-		/// do something for capture
-	}
-
-	/// if debug, print all the passed message parameter
-	PRINTLN("OnMessage:");
-	PRINTF("\ttopic   : %s\r\n", topic);
-	PRINTF("\tpaylodd : %s\r\n", tempbuf);
-	PRINTF("\tqos     : %u\r\n", properties.qos);
-	PRINTF("\tretain  : %s\r\n", BOOLSTR(properties.qos));
-	PRINTF("\tlen     : %zu\r\n", len);
-	PRINTF("\tindex   : %zu\r\n", index);
-	PRINTF("\ttotal   : %zu\r\n", total);
-}
-
-inline static void ledOnState(const uint8_t red, const uint8_t yellow,
-			      const uint8_t green)
-{
-	digitalWrite(RED_LED, red);
-	digitalWrite(YELLOW_LED, yellow);
-	digitalWrite(GREEN_LED, green);
-}
-
-inline static void publish_message_capture()
-{
-	if (mqttClient.connected() &&
-	    (elapsedTime >= INTERVALS[StateType::CAPTURE])) {
-		mqttClient.publish(TOPIC_CAPTURE, DEFAULT_QOS, DEFAULT_RETAIN,
-				   TOPIC_CAPTURE, sizeof(TOPIC_CAPTURE));
-	}
-}
 
 void setup()
 {
@@ -166,74 +76,130 @@ void setup()
 	    // set username and pasword (default null)
 	    .setCredentials(MQTT_USERNAME, MQTT_PASSWORD);
 
-	PRINTLN("Connect to Wifi");
 	// connect to wifi
 	WiFi.begin(SECRET_SSID, SECRET_PASSWORD);
 
-#if !RELEASE
 	/// precicion timer to print state each seconds
-	printerStateTimer.attach(
-	    1.f, []() { PRINT_STATE(currentState, elapsedTime); });
+	StateTimer.attach_ms(1000, []() {
+		// Decode and execute the current state
+		switch (currentState) {
+		case StateType::GREEN:
+			STATE_OUTPUT_CHANGE(0, 0, 1);
+			if (elapsedTime >= INTERVALS[StateType::GREEN]) {
+				elapsedTime = 0;
+				lastState = StateType::GREEN;
+
+				currentState = (count_of_car > 5)
+						   ? StateType::ISFIVE
+						   : StateType::YELLOW;
+
+				/// hanya memastikan untuk mereset value saat
+				/// capture terkirim
+				count_of_car = 0;
+				isCaptured = false;
+			}
+			break;
+
+		case StateType::ISFIVE: /// state saat terdeteksi 5 mobil
+			STATE_OUTPUT_CHANGE(0, 0, 1);
+			if (elapsedTime >= INTERVALS[StateType::ISFIVE]) {
+				elapsedTime = 0;
+				currentState = StateType::YELLOW;
+			}
+			break;
+
+		case StateType::YELLOW:
+			STATE_OUTPUT_CHANGE(0, 1, 0);
+			if (elapsedTime >= INTERVALS[StateType::YELLOW]) {
+				elapsedTime = 0;
+				currentState = (lastState == StateType::RED)
+						   ? StateType::GREEN
+						   : StateType::RED;
+			}
+			break;
+
+		case StateType::RED:
+			STATE_OUTPUT_CHANGE(1, 0, 0);
+			if ((elapsedTime == INTERVALS[StateType::CAPTURE])) {
+				mqttClient.publish(
+				    TOPIC_CAPTURE, DEFAULT_QOS, DEFAULT_RETAIN,
+				    TOPIC_CAPTURE, sizeof(TOPIC_CAPTURE));
+			}
+
+			if (elapsedTime >= INTERVALS[StateType::RED]) {
+				elapsedTime = 0;
+				lastState = StateType::RED;
+				currentState = StateType::YELLOW;
+			}
+			break;
+
+		default:
+			break;
+		}
+		elapsedTime++;
+
+#if RELEASE == 0
+		PRINT(NAME_STATE_CONSTANT[currentState]);
+		PRINTF(" State: %d second remaining",
+		       (INTERVALS[currentState] - elapsedTime));
+		PRINTLN();
 #endif
+	});
 }
 
-void loop()
+/// loop gk kepake, karena sebelum e saat di test di esp32,  pake loop, banyak
+/// bugnya, yang tiba tiba hard reset sendiri, maupun freeze
+/// jadi untuk state nya, pake timer ticker (didalam setup())
+void loop() {}
+
+void OnMqttEventConnect(bool sessionPresent)
 {
-	/// update state dan interval dengan millis
-	startTime = millis();
-	// Decode and execute the current state
-	switch (currentState) {
-	case StateType::GREEN:
-		ledOnState(0, 0, 1);
+	PRINTLN("Connected to MQTT.");
+	PRINTF("Session present: %s\r\n", BOOLSTR(sessionPresent));
+	auto _id1 = mqttClient.subscribe(TOPIC_CAPTURE, DEFAULT_QOS);
+	PRINTF("subs topic '%s', QoS 0, id: %d\r\n", TOPIC_CAPTURE, _id1);
+	(void)(_id1); // ignore warning unused variable on release
+	auto _id2 = mqttClient.subscribe(TOPIC_COUNT_OF_CAR, DEFAULT_QOS);
+	PRINTF("subs topic '%s', QoS 0, id: %d\r\n", TOPIC_COUNT_OF_CAR, _id2);
+	(void)(_id2); // ignore warning unused variable on release
+}
 
-		if (elapsedTime >= INTERVALS[StateType::GREEN]) {
-			elapsedTime = 0;
-			lastState = StateType::GREEN;
+void OnMqttEventDisconnect(AsyncMqttClientDisconnectReason reason)
+{
+	// if debug print reason why disconnected
+	PRINT_MQTT_DISCONNECT_REASON(reason);
+	if (WiFi.isConnected())
+		mqttReconnectTimer.once(2, []() { mqttClient.connect(); });
+}
 
-			if (mqttClient.connected() && isCarGreaterThanFive) {
-				nextState = StateType::ISFIVE;
-				mqttClient.publish(TOPIC_COUNT_OF_CAR,
-						   DEFAULT_QOS, DEFAULT_RETAIN,
-						   "0", sizeof("0"));
-				isCarGreaterThanFive = false;
-			} else {
-				nextState = StateType::YELLOW;
-			}
-		}
-		break;
+void OnMqttEventMessage(char *topic, char *payload,
+			AsyncMqttClientMessageProperties properties, size_t len,
+			size_t index, size_t total)
+{
+	/// early return if payload is null
+	if (payload == nullptr)
+		return;
 
-	case StateType::ISFIVE: /// state saat terdeteksi 5 mobil
-		ledOnState(0, 0, 1);
-		if (elapsedTime >= INTERVALS[StateType::ISFIVE]) {
-			elapsedTime = 0;
-			nextState = StateType::YELLOW;
-		}
-		break;
-
-	case StateType::YELLOW:
-		ledOnState(0, 1, 0);
-		if (elapsedTime >= INTERVALS[StateType::YELLOW]) {
-			elapsedTime = 0;
-			nextState = (lastState == StateType::RED)
-					? StateType::GREEN
-					: StateType::RED;
-		}
-		break;
-
-	case StateType::RED:
-		ledOnState(1, 0, 0);
-		publish_message_capture();
-
-		if (elapsedTime >= INTERVALS[StateType::RED]) {
-			elapsedTime = 0;
-			lastState = StateType::RED;
-			nextState = StateType::YELLOW;
-		}
-		break;
-
-	default:
-		break;
+	static char tempbuf[MAX_PAYLOAD_BUFFER_SIZE] = {0};
+	strncpy(tempbuf, payload, len);
+	/// compare each topics
+	if (0 == strcmp(topic, TOPIC_COUNT_OF_CAR)) {
+		/// parse string payload into unsigned integer
+		// check if ppayload greater than 5
+		count_of_car = atoi(tempbuf);
 	}
-	currentState = nextState;
-	elapsedTime += millis() - startTime;
+	if (0 == strcmp(topic, TOPIC_CAPTURE)) {
+		/// do something for capture
+		isCaptured = (0 == strcmp(tempbuf, TOPIC_CAPTURE));
+	}
+
+	/// if debug, print all the passed message parameter
+	PRINTLN("OnMessage:");
+	PRINTF("\ttopic   : %s\r\n", topic);
+	PRINTF("\tpayload : %s\r\n", tempbuf);
+	PRINTF("\tqos     : %u\r\n", properties.qos);
+	PRINTF("\tretain  : %s\r\n", BOOLSTR(properties.qos));
+	PRINTF("\tlen     : %zu\r\n", len);
+	PRINTF("\tindex   : %zu\r\n", index);
+	PRINTF("\ttotal   : %zu\r\n", total);
 }
