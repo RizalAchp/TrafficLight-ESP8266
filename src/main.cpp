@@ -92,7 +92,7 @@ OnMqttEventMessage(char *topic, char *payload,
 
 	static char tempbuf[32] = {0};
 	memcpy(tempbuf, payload, len);
-    tempbuf[len] = '\0';
+	tempbuf[len] = '\0';
 	/// compare each topics
 	if (0 == strcmp(topic, TOPIC_COUNT_OF_CAR)) {
 		/// parse string payload into unsigned integer
@@ -189,15 +189,15 @@ void loop()
 		if (elapsedTime >= INTERVALS[StateType::GREEN]) {
 			elapsedTime = 0;
 			lastState = StateType::GREEN;
-			nextState = (isCarGreaterThanFive == true)
-					? StateType::ISFIVE
-					: StateType::YELLOW;
 
-			if (mqttClient.connected()) {
+			if (mqttClient.connected() && isCarGreaterThanFive) {
+				nextState = StateType::ISFIVE;
 				mqttClient.publish(TOPIC_COUNT_OF_CAR,
 						   DEFAULT_QOS, DEFAULT_RETAIN,
 						   "0", sizeof("0"));
 				isCarGreaterThanFive = false;
+			} else {
+				nextState = StateType::YELLOW;
 			}
 		}
 		break;
