@@ -9,16 +9,41 @@
 #include <Ticker.h>
 /// #include <LiquidCrystal_I2C.h>
 
+/// define for pin led / lamp
+#define RED_LED D5
+#define YELLOW_LED D6
+#define GREEN_LED D7
+
 /////////////////////////////////////////////////////////////////////////
 ///               STATE TYPE TRAFFIC LIGHT BERUPA ENUM                ///
 /////////////////////////////////////////////////////////////////////////
-enum StateType {
-	GREEN,
-	YELLOW,
-	RED,
-	ISFIVE,
-	CAPTURE,
+enum StateType : uint8_t {
+	GREEN = 0,
+	YELLOW = 1,
+	RED = 2,
+	ISFIVE = 3,
+	CAPTURE = 4,
 };
+
+#define STATE_OUTPUT_CHANGE(_RED, _YELLOW, _GREEN)                             \
+	{                                                                      \
+		digitalWrite(RED_LED, _RED);                                   \
+		digitalWrite(YELLOW_LED, _YELLOW);                             \
+		digitalWrite(GREEN_LED, _GREEN);                               \
+	}
+
+/// callback event saat mqtt client mendapatkan message publish dari broker
+/// => check apakah topic sesuai dengan yang dibutuhkan dan memproses payload
+/// nya
+void OnMqttEventMessage(char *topic, char *payload,
+			AsyncMqttClientMessageProperties properties, size_t len,
+			size_t index, size_t total);
+/// callback event saat Mqtt client terputus dari sambungan mqtt server broker
+/// =>  subscribe pada topic yang telah di tentukan
+void OnMqttEventDisconnect(AsyncMqttClientDisconnectReason reason);
+/// callback event saat Mqtt client telah tersambung pada server broker MQTT
+/// =>  subscribe pada topic yang telah di tentukan
+void OnMqttEventConnect(bool sessionPresent);
 
 //////////////////////////////////////////////////////////////////////////
 /// NDEBUG DEFINE BLOCK, UNTUK NONAKTIFKAN SERIAL JIKA RELEASE MODE    ///
@@ -34,6 +59,12 @@ enum StateType {
 void PRINT_MQTT_DISCONNECT_REASON(AsyncMqttClientDisconnectReason reason);
 void PRINT_WIFI_DISCONNECT_REASON(const WiFiEventStationModeDisconnected &ev);
 void PRINT_STATE(StateType type, const unsigned long elapsed);
+constexpr const char *NAME_STATE_CONSTANT[] = {
+    /*StateType::GREEN*/ "Green",
+    /*StateType::YELLOW*/ "Yellow",
+    /*StateType::RED*/ "Red",
+    /*StateType::ISFIVE*/ "(CarCount > 5)",
+    /*StateType::ISFIVE*/ "Capture"};
 
 #else
 #define SERIAL_BEGIN(...)
@@ -51,15 +82,14 @@ void PRINT_STATE(StateType type, const unsigned long elapsed);
 //////////////////////////////////////////////////////////////////////
 
 /// INTERVAL DALAM MILISECOND ( detik * 1000 )
-constexpr auto SECOND_MS(const unsigned long SEC) { return 1000UL * SEC; }
 
 /// constant array to make an easier access by indexing with StateType
-constexpr const unsigned long INTERVALS[] = {
-    /*StateType::GREEN => */ SECOND_MS(30),
-    /*StateType::YELLOW => */ SECOND_MS(2),
-    /*StateType::RED => */ SECOND_MS(30),
-    /*StateType::ISFIVE => */ SECOND_MS(10),
-    /*StateType::CAPTURE => */ SECOND_MS(25)};
+constexpr const uint8_t INTERVALS[] = {
+    /*StateType::GREEN in second => */ (30),
+    /*StateType::YELLOW in second => */ (2),
+    /*StateType::RED => in second */ (30),
+    /*StateType::ISFIVE in second => */ (10),
+    /*StateType::CAPTURE in second => */ (25)};
 
 #ifndef _SSID_WIFI
 
