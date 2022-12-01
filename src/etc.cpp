@@ -32,6 +32,120 @@ void PRINT_MQTT_DISCONNECT_REASON(AsyncMqttClientDisconnectReason reason)
 		break;
 	}
 }
+void PRINT_WIFI_DISCONNECT_REASON(const WiFiEventInfo_t &eventinfo)
+{
+	wifi_event_sta_disconnected_t ed = eventinfo.wifi_sta_disconnected;
+	char ssidbuf[32] = {0};
+	strncpy(ssidbuf, (const char *)ed.ssid, ed.ssid_len);
+	PRINTLN(F("WIFI DISCONNECTED!"));
+	PRINTF("ssid: %s\r\n", ssidbuf);
+	PRINTF("bssid: %s\r\n", (const char *)ed.bssid);
+	PRINTF("reason: [%d] => ", ed.reason);
+	wifi_err_reason_t reason = (wifi_err_reason_t)ed.reason;
+	switch (reason) {
+	case WIFI_REASON_UNSPECIFIED:
+		PRINTLN(F("UNSPECIFIED"));
+		break;
+	case WIFI_REASON_AUTH_EXPIRE:
+		PRINTLN(F("AUTH_EXPIRE"));
+		break;
+	case WIFI_REASON_AUTH_LEAVE:
+		PRINTLN(F("AUTH_LEAVE"));
+		break;
+	case WIFI_REASON_ASSOC_EXPIRE:
+		PRINTLN(F("ASSOC_EXPIRE"));
+		break;
+	case WIFI_REASON_ASSOC_TOOMANY:
+		PRINTLN(F("ASSOC_TOOMANY"));
+		break;
+	case WIFI_REASON_NOT_AUTHED:
+		PRINTLN(F("NOT_AUTHED"));
+		break;
+	case WIFI_REASON_NOT_ASSOCED:
+		PRINTLN(F("NOT_ASSOCED"));
+		break;
+	case WIFI_REASON_ASSOC_LEAVE:
+		PRINTLN(F("ASSOC_LEAVE"));
+		break;
+	case WIFI_REASON_ASSOC_NOT_AUTHED:
+		PRINTLN(F("ASSOC_NOT_AUTHED"));
+		break;
+	case WIFI_REASON_DISASSOC_PWRCAP_BAD:
+		PRINTLN(F("DISASSOC_PWRCAP_BAD"));
+		break;
+	case WIFI_REASON_DISASSOC_SUPCHAN_BAD:
+		PRINTLN(F("DISASSOC_SUPCHAN_BAD"));
+		break;
+	case WIFI_REASON_BSS_TRANSITION_DISASSOC:
+		PRINTLN(F("BSS_TRANSITION_DISASSOC"));
+		break;
+	case WIFI_REASON_IE_INVALID:
+		PRINTLN(F("IE_INVALID"));
+		break;
+	case WIFI_REASON_MIC_FAILURE:
+		PRINTLN(F("MIC_FAILURE"));
+		break;
+	case WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT:
+		PRINTLN(F("4WAY_HANDSHAKE_TIMEOUT"));
+		break;
+	case WIFI_REASON_GROUP_KEY_UPDATE_TIMEOUT:
+		PRINTLN(F("GROUP_KEY_UPDATE_TIMEOUT"));
+		break;
+	case WIFI_REASON_IE_IN_4WAY_DIFFERS:
+		PRINTLN(F("IE_IN_4WAY_DIFFERS"));
+		break;
+	case WIFI_REASON_GROUP_CIPHER_INVALID:
+		PRINTLN(F("GROUP_CIPHER_INVALID"));
+		break;
+	case WIFI_REASON_PAIRWISE_CIPHER_INVALID:
+		PRINTLN(F("PAIRWISE_CIPHER_INVALID"));
+		break;
+	case WIFI_REASON_AKMP_INVALID:
+		PRINTLN(F("AKMP_INVALID"));
+		break;
+	case WIFI_REASON_UNSUPP_RSN_IE_VERSION:
+		PRINTLN(F("UNSUPP_RSN_IE_VERSION"));
+		break;
+	case WIFI_REASON_INVALID_RSN_IE_CAP:
+		PRINTLN(F("INVALID_RSN_IE_CAP"));
+		break;
+	case WIFI_REASON_802_1X_AUTH_FAILED:
+		PRINTLN(F("802_1X_AUTH_FAILED"));
+		break;
+	case WIFI_REASON_CIPHER_SUITE_REJECTED:
+		PRINTLN(F("CIPHER_SUITE_REJECTED"));
+		break;
+	case WIFI_REASON_INVALID_PMKID:
+		PRINTLN(F("INVALID_PMKID"));
+		break;
+	case WIFI_REASON_BEACON_TIMEOUT:
+		PRINTLN(F("BEACON_TIMEOUT"));
+		break;
+	case WIFI_REASON_NO_AP_FOUND:
+		PRINTLN(F("NO_AP_FOUND"));
+		break;
+	case WIFI_REASON_AUTH_FAIL:
+		PRINTLN(F("AUTH_FAIL"));
+		break;
+	case WIFI_REASON_ASSOC_FAIL:
+		PRINTLN(F("ASSOC_FAIL"));
+		break;
+	case WIFI_REASON_HANDSHAKE_TIMEOUT:
+		PRINTLN(F("HANDSHAKE_TIMEOUT"));
+		break;
+	case WIFI_REASON_CONNECTION_FAIL:
+		PRINTLN(F("CONNECTION_FAIL"));
+		break;
+	case WIFI_REASON_AP_TSF_RESET:
+		PRINTLN(F("AP_TSF_RESET"));
+		break;
+	case WIFI_REASON_ROAMING:
+		PRINTLN(F("ROAMING"));
+		break;
+	default:
+		break;
+	}
+}
 #if defined(ESP8266)
 void PRINT_WIFI_DISCONNECT_REASON(const WiFiEventStationModeDisconnected &ev)
 {
@@ -128,16 +242,4 @@ void PRINT_WIFI_DISCONNECT_REASON(const WiFiEventStationModeDisconnected &ev)
 }
 #endif
 
-constexpr const char *NAME_STATE_CONSTANT[] = {
-    /*StateType::GREEN*/ "Green",
-    /*StateType::YELLOW*/ "Yellow",
-    /*StateType::RED*/ "Red",
-    /*StateType::ISFIVE*/ "IsGreaterThanFive",
-    /*StateType::ISFIVE*/ "Capture"};
-
-void PRINT_STATE(StateType type, const unsigned long elapsed)
-{
-	PRINTF("%s State: %d second remaining\r\n", NAME_STATE_CONSTANT[type],
-	       (int)((INTERVALS[type] - elapsed) / 1000));
-}
 #endif
